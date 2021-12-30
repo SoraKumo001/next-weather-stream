@@ -4,6 +4,7 @@ import {
   ReactNode,
   Suspense,
   SuspenseProps,
+  useCallback,
   useContext,
   useEffect,
   useRef,
@@ -11,32 +12,35 @@ import {
 } from "react";
 
 type PropeatyType<T> = {
-  promise?: Promise<T>;
   value?: T;
-  init?: boolean;
+  isInit?: boolean;
+  isSuspenseLoad?: boolean;
 };
 export type SuspenseDispatch = () => void;
 const isServer = typeof window === "undefined";
-
+const cacheMap: { [key: string]: unknown } = {};
 const SuspenseContext = createContext<unknown>(undefined);
 export const useSuspense = <T,>() => useContext(SuspenseContext) as T;
+
 const SuspenseWapper = <T,>({
   property,
   idName,
   children,
+  load,
 }: {
   property: PropeatyType<T>;
   idName: string;
   children: ReactNode;
+  load: () => Promise<unknown>;
 }) => {
-  if (!property.init) throw property.promise;
-  const [isRequestValue, setRequestValue] = useState(true);
-  useEffect(() => {
-    setRequestValue(false);
-  }, []);
+  if (!property.isInit) throw load();
+  const [isRequestData, setRequestData] = useState(
+    property.isSuspenseLoad || isServer
+  );
+  useEffect(() => setRequestData(false), []);
   return (
     <SuspenseContext.Provider value={property.value}>
-      {isRequestValue && (
+      {isRequestData && (
         <script
           id={idName}
           type="application/json"
@@ -49,7 +53,6 @@ const SuspenseWapper = <T,>({
     </SuspenseContext.Provider>
   );
 };
-const cacheMap: { [key: string]: unknown } = {};
 
 export const SuspenseLoader = <T, V>({
   name,
@@ -71,43 +74,46 @@ export const SuspenseLoader = <T, V>({
   const [_, reload] = useState({});
   const idName = "#__NEXT_DATA__STREAM__" + name;
   const property = useRef<PropeatyType<T>>({}).current;
-  if (!isServer && !property.init) {
-    const cache = cacheMap[name];
-    if (cache) {
-      property.value = cache as T;
-      property.init = true;
-    } else {
-      const node = document.getElementById(idName);
-      if (node) {
-        property.value = JSON.parse(node.innerHTML).value;
-        property.init = true;
-        cacheMap[name] = property.value;
-      }
+  if (!isServer && !property.isInit) {
+    const value = cacheMap[name];
+    if (value) {
+      property.value = value as T;
+      property.isInit = true;
+      property.isSuspenseLoad = false;
     }
   }
-  if (!property.init && !property.promise) {
-    property.promise = loader(loaderValue as V).then((v) => {
-      property.value = v;
-      property.init = true;
-      cacheMap[name] = property.value;
-      return v;
+  const load = useCallback(() => {
+    return new Promise<T>((resolve) => {
+      if (!isServer) {
+        const node = document.getElementById(idName);
+        if (node) {
+          property.isSuspenseLoad = true;
+          resolve(JSON.parse(node.innerHTML).value);
+          return;
+        }
+      }
+      loader(loaderValue as V).then((v) => {
+        property.isSuspenseLoad = false;
+        resolve(v);
+      });
+    }).then((value) => {
+      property.isInit = true;
+      property.value = value;
+      cacheMap[name] = value;
+      onLoaded?.(value);
     });
-  }
-  useEffect(() => {
-    onLoaded?.(property.value as T);
-  }, []);
+  }, [loader, onLoaded]);
   if (dispatch) {
     dispatch.current = () => {
-      property.promise = undefined;
       property.value = undefined;
-      property.init = false;
+      property.isInit = false;
       delete cacheMap[name];
       reload({});
     };
   }
   return (
     <Suspense fallback={fallback || false}>
-      <SuspenseWapper<T> idName={idName} property={property}>
+      <SuspenseWapper<T> idName={idName} property={property} load={load}>
         {children}
       </SuspenseWapper>
     </Suspense>
