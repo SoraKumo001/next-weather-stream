@@ -2,7 +2,6 @@
  * @type { import("next").NextConfig}
  */
 const config = {
-  swcMinify: true,
   reactStrictMode: true,
   experimental: {
     cpus: 4,
