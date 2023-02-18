@@ -34,10 +34,6 @@ const Weather = () => {
 
 const Page = () => {
   const router = useRouter();
-  if (!router.isReady) {
-    console.log(router);
-    throw new Promise((resolve) => setTimeout(resolve, 100));
-  }
   const id = router.query["id"];
   const dispatch = useRef<SuspenseDispatch>();
   if (!id) return null;
