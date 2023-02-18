@@ -26,9 +26,7 @@ const Weather = () => {
       <div>{weather.headlineText}</div>
       <pre>{weather.text}</pre>
       <div>
-        <Link href="/">
-          <a>戻る</a>
-        </Link>
+        <Link href="/">戻る</Link>
       </div>
     </div>
   );
@@ -36,6 +34,10 @@ const Weather = () => {
 
 const Page = () => {
   const router = useRouter();
+  if (!router.isReady) {
+    console.log(router);
+    throw new Promise((resolve) => setTimeout(resolve, 100));
+  }
   const id = router.query["id"];
   const dispatch = useRef<SuspenseDispatch>();
   if (!id) return null;

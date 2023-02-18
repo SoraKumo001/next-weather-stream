@@ -32,9 +32,7 @@ const AreaList = () => {
     <div>
       {Object.entries(area.offices).map(([code, { name }]) => (
         <div key={code}>
-          <Link href={`/weather/?id=${code}`}>
-            <a>{name}</a>
-          </Link>
+          <Link href={`/weather/?id=${code}`}>{name}</Link>
         </div>
       ))}
     </div>
